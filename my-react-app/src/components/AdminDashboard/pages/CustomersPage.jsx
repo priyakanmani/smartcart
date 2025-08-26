@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Edit, Trash2, UserPlus, Users, AlertTriangle, ChevronRight, ShoppingCart } from "lucide-react";
+import { Edit, Trash2, UserPlus, Users, AlertTriangle, ChevronRight, ShoppingCart, Copy } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -11,6 +11,31 @@ const initialForm = {
   shopAddress: "",
   phone: "",
   assignedCarts: [],
+  shopId: "",
+};
+
+// Helper function to generate shop ID
+const generateShopId = (shopName, existingManagers) => {
+  // Create base ID from shop name
+  const baseId = shopName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '') // Remove special characters
+    .substring(0, 6); // Take first 6 characters
+  
+  // Find all existing shop IDs with the same base
+  const existingIds = existingManagers
+    .map(m => m.shop?.id)
+    .filter(id => id && id.startsWith(baseId))
+    .map(id => {
+      const match = id.match(/\d+$/);
+      return match ? parseInt(match[0]) : 0;
+    });
+  
+  // Get the next available number
+  const nextNumber = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+  
+  return `${baseId}${nextNumber.toString().padStart(3, '0')}`;
 };
 
 const CartAssignment = ({ availableCarts, assignedCarts, onAssignCart, onUnassignCart }) => {
@@ -76,6 +101,7 @@ const CustomersPage = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [generatedShopId, setGeneratedShopId] = useState("");
 
   const getAuthHeader = () => {
     const token = localStorage.getItem("token");
@@ -97,6 +123,7 @@ const CustomersPage = () => {
     setForm(initialForm);
     setEditing(null);
     setErrors({});
+    setGeneratedShopId("");
   };
 
   const validate = (isEdit = false) => {
@@ -165,6 +192,15 @@ const CustomersPage = () => {
     fetchAvailableCarts();
   }, []);
 
+  // Generate shop ID when shop name changes
+  useEffect(() => {
+    if (form.shopName.trim() && !editing) {
+      const newShopId = generateShopId(form.shopName, managers);
+      setGeneratedShopId(newShopId);
+      setForm(prev => ({ ...prev, shopId: newShopId }));
+    }
+  }, [form.shopName, managers, editing]);
+
   const handleChange = (e) => {
     setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
     setErrors((prev) => ({ ...prev, [e.target.name]: null }));
@@ -206,11 +242,13 @@ const CustomersPage = () => {
         email: form.email,
         shop: {
           name: form.shopName,
+          id: form.shopId || generateShopId(form.shopName, managers),
           address: form.shopAddress,
           phone: form.phone,
         },
         assignedCarts: form.assignedCarts,
       };
+      
       if (form.password) payload.password = form.password;
 
       const url = isEdit
@@ -278,9 +316,11 @@ const CustomersPage = () => {
       shopAddress: manager.shop?.address || "",
       phone: manager.shop?.phone || "",
       assignedCarts: manager.assignedCarts || [],
+      shopId: manager.shop?.id || "",
     });
     setErrors({});
     setSuccessMsg("");
+    setGeneratedShopId(manager.shop?.id || "");
   };
 
   const handleDelete = async (id) => {
@@ -300,6 +340,21 @@ const CustomersPage = () => {
     } catch (err) {
       setErrors({ general: `Delete failed: ${err.message}` });
     }
+  };
+
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        // Show a temporary success message
+        const originalText = document.getElementById('copy-button').innerText;
+        document.getElementById('copy-button').innerText = 'Copied!';
+        setTimeout(() => {
+          document.getElementById('copy-button').innerText = originalText;
+        }, 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err);
+      });
   };
 
   if (loading) {
@@ -417,6 +472,34 @@ const CustomersPage = () => {
               )
             )}
 
+            {/* Shop ID Field */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Shop ID
+              </label>
+              <div className="flex items-center">
+                <input
+                  type="text"
+                  value={editing ? form.shopId : generatedShopId}
+                  readOnly
+                  className="w-full border border-gray-300 rounded-lg px-4 py-2 bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  placeholder="Shop ID will be generated automatically"
+                />
+                <button
+                  type="button"
+                  id="copy-button"
+                  onClick={() => copyToClipboard(editing ? form.shopId : generatedShopId)}
+                  className="ml-2 p-2 bg-gray-200 hover:bg-gray-300 rounded-lg transition-colors"
+                  title="Copy to clipboard"
+                >
+                  <Copy className="h-4 w-4 text-gray-600" />
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500">
+                Auto-generated unique shop identifier
+              </p>
+            </div>
+
             <div className="md:col-span-2">
               <CartAssignment
                 availableCarts={availableCarts}
@@ -515,7 +598,7 @@ const CustomersPage = () => {
                           {m.shop?.name}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {new Date(m.createdAt).toLocaleDateString()}
+                          ID: {m.shop?.id}
                         </p>
                       </div>
                     </div>

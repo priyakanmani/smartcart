@@ -8,6 +8,7 @@ const cookieParser = require('cookie-parser');
 const Cart = require("./models/Cart");
 const managerRoutes = require('./routes/manager');
 dotenv.config();
+const productRoutes = require('./routes/products');
 
 const app = express();
 
@@ -28,6 +29,16 @@ app.use('/api/admin', adminRoutes);
 const cartRoutes = require('./routes/carts');
 app.use('/api/carts', cartRoutes);
 app.use('/api/manager', managerRoutes); // All manager routes will be prefixed with /api/manager
+// Routes
+
+// Use routes
+app.use('/api/products', productRoutes);
+// Error handling middleware
+app.use((error, req, res, next) => {
+  console.error(error.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
+
 
 // MongoDB connection
 mongoose
