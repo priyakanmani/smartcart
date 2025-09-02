@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -56,7 +57,16 @@ const AdminLogin = () => {
       
       if (response.ok) {
         if (data.token) {
-          localStorage.setItem('token', data.token);
+          // FIXED: Store token with the correct key 'adminToken'
+          localStorage.setItem('adminToken', data.token);
+          
+          // Also store user data if available
+          if (data.user) {
+            localStorage.setItem('adminUser', JSON.stringify(data.user));
+            localStorage.setItem('adminEmail', data.user.email || email);
+          } else {
+            localStorage.setItem('adminEmail', email);
+          }
         }
         setMessage('✅ Login successful');
         setTimeout(() => {

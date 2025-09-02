@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiFilter, FiShoppingCart } from 'react-icons/fi';
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiFilter, FiShoppingCart, FiAlertCircle } from 'react-icons/fi';
 
 const ProductManagement = () => {
   // State management
@@ -18,60 +19,88 @@ const ProductManagement = () => {
     stock: '',
     description: '',
     barcode: '',
-    image: ''
+    image: '',
   });
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   
-  // Add state for shop info
+  // State for shop info
   const [shopInfo, setShopInfo] = useState({
     id: '',
     name: '',
     email: ''
   });
 
-  // Mock data for development
-  const mockProducts = [
-    {
-      _id: '1',
-      name: 'Wireless Headphones',
-      category: 'Electronics',
-      price: 89.99,
-      stock: 45,
-      description: 'High-quality wireless headphones with noise cancellation',
-      barcode: '1234567890123',
-      image: 'https://via.placeholder.com/150',
-      shop: 'shop-1'
-    },
-    {
-      _id: '2',
-      name: 'Organic Apples',
-      category: 'Groceries',
-      price: 4.99,
-      stock: 120,
-      description: 'Fresh organic apples from local farm',
-      barcode: '2345678901234',
-      image: 'https://via.placeholder.com/150',
-      shop: 'shop-1'
-    },
-    {
-      _id: '3',
-      name: 'Men\'s T-Shirt',
-      category: 'Clothing',
-      price: 24.99,
-      stock: 32,
-      description: 'Comfortable cotton t-shirt for men',
-      barcode: '3456789012345',
-      image: 'https://via.placeholder.com/150',
-      shop: 'shop-1'
+  // Function to extract shop ID directly from localStorage
+  const getShopIdFromStorage = () => {
+    try {
+      const managerUser = localStorage.getItem('managerUser');
+      if (managerUser && managerUser !== '{}') {
+        const userData = JSON.parse(managerUser);
+        
+        // Try multiple locations for shop ID
+        if (userData.shop && userData.shop.id) {
+          return userData.shop.id; // "SARASU001"
+        } else if (userData.shopId) {
+          return userData.shopId;
+        } else if (userData.shop && typeof userData.shop === 'string') {
+          return userData.shop;
+        } else if (userData.id) {
+          return userData.id;
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error extracting shop ID from localStorage:", error);
     }
-  ];
+    return ''; // Return empty string if not found
+  };
 
-  // Fetch products from the backend or use mock data
+  // Function to get the auth token properly
+  const getAuthToken = () => {
+    const token = localStorage.getItem('managerToken');
+    // Check if token is invalid (like 'Yes') and clear it
+    if (token && token !== 'Yes' && token.length > 20) {
+      return token;
+    }
+    
+    // If token is invalid, try to get from user data
+    try {
+      const managerUser = localStorage.getItem('managerUser');
+      if (managerUser) {
+        const userData = JSON.parse(managerUser);
+        return userData.token;
+      }
+    } catch (error) {
+      console.error("Error getting token from user data:", error);
+    }
+    
+    return null;
+  };
+
+  // Fetch products from the backend
   useEffect(() => {
     const fetchProducts = async () => {
       setIsLoading(true);
       try {
-        // Try to fetch from the actual API
-        const response = await fetch('http://localhost:5000/api/products');
+        const shopId = getShopIdFromStorage();
+        if (!shopId) {
+          setErrorMessage('Shop information not found. Please log in again.');
+          setIsLoading(false);
+          return;
+        }
+
+        const token = getAuthToken();
+        if (!token) {
+          setErrorMessage('Authentication token not found. Please log in again.');
+          setIsLoading(false);
+          return;
+        }
+
+        const response = await fetch(`http://localhost:5000/api/products?shop=${shopId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
         if (response.ok) {
           const data = await response.json();
@@ -81,23 +110,17 @@ const ProductManagement = () => {
           // Extract categories
           const uniqueCategories = [...new Set(data.map(product => product.category))];
           setCategories(uniqueCategories);
+        } else if (response.status === 401) {
+          setErrorMessage('Authentication failed. Please log in again.');
+          // Clear invalid token
+          localStorage.removeItem('managerToken');
         } else {
-          // If API fails, use mock data
-          console.warn('API not available, using mock data');
-          setProducts(mockProducts);
-          setFilteredProducts(mockProducts);
-          
-          const uniqueCategories = [...new Set(mockProducts.map(product => product.category))];
-          setCategories(uniqueCategories);
+          const errorData = await response.json();
+          setErrorMessage(errorData.message || 'Failed to fetch products');
         }
       } catch (error) {
-        console.error('Error fetching products, using mock data:', error);
-        // Use mock data as fallback
-        setProducts(mockProducts);
-        setFilteredProducts(mockProducts);
-        
-        const uniqueCategories = [...new Set(mockProducts.map(product => product.category))];
-        setCategories(uniqueCategories);
+        console.error('Error fetching products:', error);
+        setErrorMessage('Network error. Please check your connection.');
       } finally {
         setIsLoading(false);
       }
@@ -110,50 +133,47 @@ const ProductManagement = () => {
   useEffect(() => {
     const retrieveShopInfo = () => {
       try {
-        // Get data from localStorage
+        // Get shop ID directly
+        const shopId = getShopIdFromStorage();
+        
+        // Get other shop info
         const managerUser = localStorage.getItem('managerUser');
         const managerEmail = localStorage.getItem('managerEmail');
         
-        console.log('📋 LocalStorage data retrieved:');
-        console.log('managerUser:', managerUser);
-        console.log('managerEmail:', managerEmail);
+        let shopName = '';
+        let email = '';
         
         if (managerUser && managerUser !== '{}') {
           try {
             const userData = JSON.parse(managerUser);
-            console.log('📦 Parsed user data from localStorage:', userData);
             
-            // Set shop info
-            setShopInfo({
-              id: userData.shopId || userData.shop?._id || '',
-              name: userData.shopName || userData.shop?.name || '',
-              email: userData.email || managerEmail || ''
-            });
+            // Extract shop name
+            if (userData.shop && userData.shop.name) {
+              shopName = userData.shop.name;
+            } else if (userData.shopName) {
+              shopName = userData.shopName;
+            }
             
-            // Also log to console
-            console.log('🏪 Shop Information:');
-            console.log('Shop ID:', userData._id || userData.shop?._id || 'Not available');
-            console.log('Shop Name:', userData.shopName || userData.shop?.name || 'Not available');
-            console.log('Email:', userData.email || managerEmail || 'Not available');
-            
+            // Extract email
+            if (userData.email) {
+              email = userData.email;
+            }
           } catch (error) {
             console.error("❌ Error parsing user data:", error);
           }
-        } else if (managerEmail) {
-          // If we only have email
-          setShopInfo({
-            id: '',
-            name: '',
-            email: managerEmail
-          });
-          
-          console.log('🏪 Shop Information:');
-          console.log('Email:', managerEmail);
-          console.log('Shop ID: Not available');
-          console.log('Shop Name: Not available');
-        } else {
-          console.log('❌ No manager data found in localStorage');
         }
+        
+        if (managerEmail) {
+          email = managerEmail;
+        }
+        
+        // Set shop info
+        setShopInfo({
+          id: shopId,
+          name: shopName,
+          email: email
+        });
+        
       } catch (error) {
         console.error('Error retrieving shop info from localStorage:', error);
       }
@@ -162,7 +182,6 @@ const ProductManagement = () => {
     retrieveShopInfo();
   }, []);
 
-  // Rest of your component code remains the same...
   // Filter products based on search and category
   useEffect(() => {
     let result = products;
@@ -170,7 +189,8 @@ const ProductManagement = () => {
     if (searchTerm) {
       result = result.filter(product => 
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.description.toLowerCase().includes(searchTerm.toLowerCase())
+        product.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.barcode && product.barcode.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
     
@@ -188,141 +208,312 @@ const ProductManagement = () => {
       ...formData,
       [name]: value
     });
+    
+    // Clear error message when user starts typing
+    if (errorMessage) {
+      setErrorMessage('');
+    }
   };
 
   // Handle product submission (create or update)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
+    setSuccessMessage('');
     
     try {
+      // Get shop ID directly from localStorage
+      const shopId = getShopIdFromStorage();
+      
+      if (!shopId) {
+        setErrorMessage('Shop information not found. Please log in again.');
+        return;
+      }
+      
+      // Get auth token
+      const token = getAuthToken();
+      if (!token) {
+        setErrorMessage('Authentication token not found. Please log in again.');
+        return;
+      }
+      
+      // Prepare the product data with the correct shop ID
+      const productData = {
+        ...formData,
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock),
+        shop: shopId // This ensures the shop ID is always included
+      };
+      
+      // Convert empty barcode to undefined to avoid validation issues
+      if (productData.barcode === '') {
+        delete productData.barcode;
+      }
+      
       if (editingProduct) {
-        // Try to update via API
-        try {
-          const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(formData),
-          });
-          
-          if (response.ok) {
-            const updatedProduct = await response.json();
-            setProducts(products.map(product => 
-              product._id === updatedProduct._id ? updatedProduct : product
-            ));
-          } else {
-            throw new Error('API update failed');
-          }
-        } catch (error) {
-          // Fallback to local update
-          console.warn('API update failed, updating locally:', error);
+        // Update product - ensure shop ID is included
+        const updateData = {
+          ...productData,
+          shop: shopId // Re-add shop ID to be sure
+        };
+        
+        const response = await fetch(`http://localhost:5000/api/products/${editingProduct._id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(updateData),
+        });
+        
+        if (response.ok) {
+          const updatedProduct = await response.json();
           setProducts(products.map(product => 
-            product._id === editingProduct._id ? { ...product, ...formData } : product
+            product._id === updatedProduct._id ? updatedProduct : product
           ));
+          setSuccessMessage('Product updated successfully!');
+        } else {
+          const errorData = await response.json();
+          if (errorData.message && errorData.message.includes('Barcode already exists')) {
+            setErrorMessage('This barcode is already in use. Please use a different barcode or leave it empty.');
+          } else {
+            setErrorMessage(errorData.message || 'Failed to update product');
+          }
+          return;
         }
       } else {
-        // Try to create via API
-        try {
-          const response = await fetch('http://localhost:5000/api/products', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({...formData, shop: shopInfo.id || 'shop-1'}),
-          });
-          
-          if (response.ok) {
-            const newProduct = await response.json();
-            setProducts([...products, newProduct]);
-          } else {
-            throw new Error('API create failed');
-          }
-        } catch (error) {
-          // Fallback to local create
-          console.warn('API create failed, creating locally:', error);
-          const newProduct = {
-            _id: Date.now().toString(),
-            ...formData,
-            shop: shopInfo.id || 'shop-1'
-          };
+        // Create new product - ensure shop ID is included
+        const createData = {
+          ...productData,
+          shop: shopId // Re-add shop ID to be sure
+        };
+        
+        const response = await fetch('http://localhost:5000/api/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(createData),
+        });
+        
+        if (response.ok) {
+          const newProduct = await response.json();
           setProducts([...products, newProduct]);
+          setSuccessMessage('Product created successfully!');
+        } else {
+          const errorData = await response.json();
+          if (errorData.message && errorData.message.includes('Barcode already exists')) {
+            setErrorMessage('This barcode is already in use. Please use a different barcode or leave it empty.');
+          } else if (errorData.message && errorData.message.includes('Validation error')) {
+            setErrorMessage('Please check your input fields. All required fields must be filled correctly.');
+          } else {
+            setErrorMessage(errorData.message || 'Failed to create product');
+          }
+          return;
         }
       }
       
-      // Reset form and close modal
-      setFormData({
-        name: '',
-        category: '',
-        price: '',
-        stock: '',
-        description: '',
-        barcode: '',
-        image: ''
-      });
-      setShowAddModal(false);
-      setEditingProduct(null);
+      // Reset form and close modal after delay to show success message
+      setTimeout(() => {
+        setFormData({
+          name: '',
+          category: '',
+          price: '',
+          stock: '',
+          description: '',
+          barcode: '',
+          image: ''
+        });
+        setShowAddModal(false);
+        setEditingProduct(null);
+        setErrorMessage('');
+        setSuccessMessage('');
+      }, 1500);
+      
     } catch (error) {
       console.error('Error saving product:', error);
+      setErrorMessage('Error saving product. Please try again.');
     }
   };
 
-  // The rest of your component code (handleEdit, handleDelete, and JSX) remains the same...
   // Handle product editing
   const handleEdit = (product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
       category: product.category,
-      price: product.price,
-      stock: product.stock,
+      price: product.price.toString(),
+      stock: product.stock.toString(),
       description: product.description || '',
       barcode: product.barcode || '',
       image: product.image || ''
     });
     setShowAddModal(true);
+    setErrorMessage('');
+    setSuccessMessage('');
   };
 
   // Handle product deletion
   const handleDelete = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
-        // Try to delete via API
-        try {
-          const response = await fetch(`http://localhost:5000/api/products/${productId}`, {
-            method: 'DELETE',
-          });
-          
-          if (response.ok) {
-            setProducts(products.filter(product => product._id !== productId));
-          } else {
-            throw new Error('API delete failed');
+        const token = getAuthToken();
+        if (!token) {
+          setErrorMessage('Authentication token not found. Please log in again.');
+          return;
+        }
+        
+        const response = await fetch(`http://localhost:5000/api/products/${productId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
           }
-        } catch (error) {
-          // Fallback to local delete
-          console.warn('API delete failed, deleting locally:', error);
+        });
+        
+        if (response.ok) {
           setProducts(products.filter(product => product._id !== productId));
+          setSuccessMessage('Product deleted successfully!');
+          setTimeout(() => setSuccessMessage(''), 3000);
+        } else {
+          const errorData = await response.json();
+          setErrorMessage(errorData.message || 'Failed to delete product');
         }
       } catch (error) {
         console.error('Error deleting product:', error);
+        setErrorMessage('Error deleting product. Please try again.');
       }
+    }
+  };
+
+  // Clear all messages
+  const clearMessages = () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  // Refresh products
+  const refreshProducts = async () => {
+    setIsLoading(true);
+    try {
+      const shopId = getShopIdFromStorage();
+      if (!shopId) {
+        setErrorMessage('Shop information not found. Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      const token = getAuthToken();
+      if (!token) {
+        setErrorMessage('Authentication token not found. Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(`http://localhost:5000/api/products?shop=${shopId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data);
+        setFilteredProducts(data);
+        
+        // Extract categories
+        const uniqueCategories = [...new Set(data.map(product => product.category))];
+        setCategories(uniqueCategories);
+        setSuccessMessage('Products refreshed successfully!');
+      } else {
+        const errorData = await response.json();
+        setErrorMessage(errorData.message || 'Failed to refresh products');
+      }
+    } catch (error) {
+      console.error('Error refreshing products:', error);
+      setErrorMessage('Network error. Please check your connection.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
+      {/* Success Message */}
+      {successMessage && (
+        <div className="mb-6 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <FiAlertCircle className="mr-2" />
+              <span>{successMessage}</span>
+            </div>
+            <button onClick={clearMessages} className="text-green-700 hover:text-green-900">
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Message */}
+      {errorMessage && (
+        <div className="mb-6 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <FiAlertCircle className="mr-2" />
+              <span>{errorMessage}</span>
+            </div>
+            <button onClick={clearMessages} className="text-red-700 hover:text-red-900">
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
         <h1 className="text-3xl font-bold text-gray-800 mb-4 md:mb-0">
           Product Management
         </h1>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center"
-        >
-          <FiPlus className="mr-2" />
-          Add Product
-        </button>
+        <div className="flex space-x-4">
+          <button
+            onClick={refreshProducts}
+            className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg flex items-center transition-colors"
+            disabled={isLoading}
+          >
+            <FiShoppingCart className="mr-2" />
+            {isLoading ? 'Refreshing...' : 'Refresh Products'}
+          </button>
+          <button
+            onClick={() => {
+              setShowAddModal(true);
+              setEditingProduct(null);
+              setFormData({
+                name: '',
+                category: '',
+                price: '',
+                stock: '',
+                description: '',
+                barcode: '',
+                image: ''
+              });
+              clearMessages();
+            }}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg flex items-center transition-colors"
+          >
+            <FiPlus className="mr-2" />
+            Add Product
+          </button>
+        </div>
       </div>
+
+      {/* Shop Info Display */}
+      {shopInfo.id && (
+        <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+          <h2 className="text-lg font-semibold text-blue-800 mb-2">Shop Information</h2>
+          <p className="text-blue-700"><span className="font-medium">Shop ID:</span> {shopInfo.id}</p>
+          {shopInfo.name && <p className="text-blue-700"><span className="font-medium">Shop Name:</span> {shopInfo.name}</p>}
+          {shopInfo.email && <p className="text-blue-700"><span className="font-medium">Email:</span> {shopInfo.email}</p>}
+        </div>
+      )}
 
       {/* Search and Filter Section */}
       <div className="bg-white rounded-lg shadow p-6 mb-8">
@@ -333,8 +524,8 @@ const ProductManagement = () => {
             </div>
             <input
               type="text"
-              placeholder="Search products..."
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Search products by name, description, or barcode..."
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -345,7 +536,7 @@ const ProductManagement = () => {
               <FiFilter className="text-gray-400" />
             </div>
             <select
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none transition-colors"
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
             >
@@ -361,10 +552,10 @@ const ProductManagement = () => {
             </div>
           </div>
           
-          <div className="bg-blue-50 p-3 rounded-lg flex items-center">
+          <div className="bg-blue-50 p-3 rounded-lg flex items-center border border-blue-200">
             <FiShoppingCart className="text-blue-600 mr-2" />
             <span className="text-blue-800 font-medium">
-              {filteredProducts.length} products found
+              {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
             </span>
           </div>
         </div>
@@ -383,8 +574,11 @@ const ProductManagement = () => {
             <h3 className="mt-4 text-lg font-medium text-gray-900">No products found</h3>
             <p className="mt-1 text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
             <button
-              onClick={() => setShowAddModal(true)}
-              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              onClick={() => {
+                setShowAddModal(true);
+                clearMessages();
+              }}
+              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 transition-colors"
             >
               <FiPlus className="mr-2" />
               Add Product
@@ -417,15 +611,15 @@ const ProductManagement = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProducts.map((product) => (
-                  <tr key={product._id}>
+                  <tr key={product._id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-20 w-20">
+                        <div className="flex-shrink-0 h-16 w-16">
                           {product.image ? (
-                            <img className="h-20 w-20 rounded-md object-cover" src={product.image} alt={product.name} />
+                            <img className="h-16 w-16 rounded-md object-cover" src={product.image} alt={product.name} />
                           ) : (
-                            <div className="h-10 w-10 rounded-md bg-gray-200 flex items-center justify-center">
-                              <FiShoppingCart className="text-gray-400" />
+                            <div className="h-16 w-16 rounded-md bg-gray-200 flex items-center justify-center">
+                              <FiShoppingCart className="text-gray-400 h-8 w-8" />
                             </div>
                           )}
                         </div>
@@ -436,15 +630,17 @@ const ProductManagement = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{product.category}</div>
+                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                        {product.category}
+                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">₹{product.price}</div>
+                      <div className="text-sm font-semibold text-gray-900">₹{product.price.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${product.stock > 10 ? 'bg-green-100 text-green-800' : 
-                          product.stock > 0 ? 'bg-yellow-100 text-yellow-800' : 
+                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                        ${product.stock > 20 ? 'bg-green-100 text-green-800' : 
+                          product.stock > 5 ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-red-100 text-red-800'}`}>
                         {product.stock} in stock
                       </span>
@@ -455,13 +651,15 @@ const ProductManagement = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button
                         onClick={() => handleEdit(product)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-blue-600 hover:text-blue-900 mr-4 transition-colors"
+                        title="Edit product"
                       >
                         <FiEdit2 className="inline mr-1" /> Edit
                       </button>
                       <button
                         onClick={() => handleDelete(product._id)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-600 hover:text-red-900 transition-colors"
+                        title="Delete product"
                       >
                         <FiTrash2 className="inline mr-1" /> Delete
                       </button>
@@ -476,15 +674,15 @@ const ProductManagement = () => {
 
       {/* Add/Edit Product Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center">
-          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto p-6">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto p-6 m-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold text-gray-900">
                 {editingProduct ? 'Edit Product' : 'Add New Product'}
               </h3>
               <button
                 type="button"
-                className="text-gray-400 hover:text-gray-500"
+                className="text-gray-400 hover:text-gray-500 transition-colors"
                 onClick={() => {
                   setShowAddModal(false);
                   setEditingProduct(null);
@@ -497,6 +695,7 @@ const ProductManagement = () => {
                     barcode: '',
                     image: ''
                   });
+                  clearMessages();
                 }}
               >
                 <span className="sr-only">Close</span>
@@ -506,10 +705,20 @@ const ProductManagement = () => {
               </button>
             </div>
 
+            {/* Error Message in Modal */}
+            {errorMessage && (
+              <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                <div className="flex items-center">
+                  <FiAlertCircle className="mr-2" />
+                  <span className="block sm:inline">{errorMessage}</span>
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
                     Product Name *
                   </label>
                   <input
@@ -519,12 +728,13 @@ const ProductManagement = () => {
                     required
                     value={formData.name}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+                    placeholder="Enter product name"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
                     Category *
                   </label>
                   <input
@@ -534,15 +744,15 @@ const ProductManagement = () => {
                     required
                     value={formData.category}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="e.g., Electronics, Groceries"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+                    placeholder="e.g., Electronics, Groceries, Clothing"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-                      Price ($) *
+                    <label htmlFor="price" className="block text-sm font-medium text-gray-700 mb-1">
+                      Price (₹) *
                     </label>
                     <input
                       type="number"
@@ -553,12 +763,13 @@ const ProductManagement = () => {
                       required
                       value={formData.price}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+                      placeholder="0.00"
                     />
                   </div>
 
                   <div>
-                    <label htmlFor="stock" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="stock" className="block text-sm font-medium text-gray-700 mb-1">
                       Stock Quantity *
                     </label>
                     <input
@@ -569,13 +780,14 @@ const ProductManagement = () => {
                       required
                       value={formData.stock}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+                      placeholder="0"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label htmlFor="barcode" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="barcode" className="block text-sm font-medium text-gray-700 mb-1">
                     Barcode
                   </label>
                   <input
@@ -584,13 +796,16 @@ const ProductManagement = () => {
                     id="barcode"
                     value={formData.barcode}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Optional"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+                    placeholder="Optional - leave empty if not needed"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Note: Barcode must be unique. Leave empty if you don't have a barcode.
+                  </p>
                 </div>
 
                 <div>
-                  <label htmlFor="image" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">
                     Image URL
                   </label>
                   <input
@@ -599,13 +814,13 @@ const ProductManagement = () => {
                     id="image"
                     value={formData.image}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                    placeholder="Optional"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
+                    placeholder="https://example.com/image.jpg"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
                     Description
                   </label>
                   <textarea
@@ -614,7 +829,7 @@ const ProductManagement = () => {
                     rows={3}
                     value={formData.description}
                     onChange={handleInputChange}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-colors"
                     placeholder="Optional product description"
                   />
                 </div>
@@ -635,14 +850,15 @@ const ProductManagement = () => {
                       barcode: '',
                       image: ''
                     });
+                    clearMessages();
                   }}
-                  className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
                   {editingProduct ? 'Update Product' : 'Add Product'}
                 </button>

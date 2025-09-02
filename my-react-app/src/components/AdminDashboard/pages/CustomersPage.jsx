@@ -47,14 +47,14 @@ const CartAssignment = ({ availableCarts, assignedCarts, onAssignCart, onUnassig
           <p className="text-sm text-gray-500">No carts assigned</p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {assignedCarts.map(cartId => (
+            {assignedCarts.map(cart => (
               <div 
-                key={cartId} 
+                key={cart.cart_id || cart} 
                 className="flex items-center bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
               >
-                <span>Cart #{cartId}</span>
+                <span>Cart #{cart.cart_id || cart}</span>
                 <button 
-                  onClick={() => onUnassignCart(cartId)}
+                  onClick={() => onUnassignCart(cart.cart_id || cart)}
                   className="ml-2 text-blue-600 hover:text-blue-800"
                 >
                   &times;
@@ -80,7 +80,7 @@ const CartAssignment = ({ availableCarts, assignedCarts, onAssignCart, onUnassig
         >
           <option value="">Select cart to assign</option>
           {availableCarts
-            .filter(cart => !assignedCarts.includes(cart.cart_id))
+            .filter(cart => !assignedCarts.some(ac => (ac.cart_id || ac) === cart.cart_id))
             .map(cart => (
               <option key={cart.cart_id} value={cart.cart_id}>
                 Cart #{cart.cart_id} ({cart.status})
@@ -208,7 +208,7 @@ const CustomersPage = () => {
   };
 
   const handleAssignCart = (cartId) => {
-    if (!form.assignedCarts.includes(cartId)) {
+    if (!form.assignedCarts.some(cart => (cart.cart_id || cart) === cartId)) {
       setForm(prev => ({
         ...prev,
         assignedCarts: [...prev.assignedCarts, cartId],
@@ -219,7 +219,7 @@ const CustomersPage = () => {
   const handleUnassignCart = (cartId) => {
     setForm(prev => ({
       ...prev,
-      assignedCarts: prev.assignedCarts.filter(id => id !== cartId),
+      assignedCarts: prev.assignedCarts.filter(cart => (cart.cart_id || cart) !== cartId),
     }));
   };
 
@@ -395,8 +395,8 @@ const CustomersPage = () => {
                 <Users className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Managers</h1>
-                <p className="text-gray-600 mt-1">
+                
+                <p className="text-xl font-semibold text-gray-900 mt-1">
                   {editing ? "Edit manager details" : "Add and manage shop managers"}
                 </p>
               </div>

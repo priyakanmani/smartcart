@@ -1,109 +1,117 @@
-const express = require('express');
-const router = express.Router(); // Use Express Router, not the 'router' package
-const Product = require('../models/Product');
 
-// Mock authentication middleware (replace with your actual auth middleware)
+
+
+
+
+const express = require('express');
+const router = express.Router();
+const Product = require('../models/Product');
+const jwt = require('jsonwebtoken');
+
+// Middleware to verify JWT and attach user data
 const auth = (req, res, next) => {
-  // For testing, we'll simulate a logged-in user
-  req.user = { shopId: 'your-shop-id-here' }; // Replace with actual user data from JWT
-  next();
+  const token = req.header('Authorization')?.split(' ')[1]; // Expecting "Bearer <token>"
+  if (!token) return res.status(401).json({ msg: 'No token, authorization denied' });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); 
+    console.log("🔑 Decoded JWT:", decoded); // 👀 See exactly what’s inside
+    req.user = decoded; // decoded contains { id, shopId, ... }
+    next();
+  } catch (err) {
+    res.status(401).json({ msg: 'Token is not valid' });
+  }
 };
 
-// Get all products
+// ✅ Add a new product (protected route)
+router.post('/', auth, async (req, res) => {
+  try {
+    const { name, category, price, stock, description, barcode, image } = req.body;
+
+    if (!req.user.shopId) {
+      return res.status(400).json({ msg: 'Shop ID not found in token' });
+    }
+
+    const product = new Product({
+      name,
+      category,
+      price,
+      stock,
+      description,
+      barcode,
+      image,
+      shop: req.user.shopId, // ✅ Use shopId directly
+    });
+
+    await product.save();
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ msg: 'Server error', error: err.message });
+  }
+});
+
+// ✅ Get all products of a shop (protected route)
 router.get('/', auth, async (req, res) => {
   try {
+    if (!req.user.shopId) {
+      return res.status(400).json({ msg: 'Shop ID not found in token' });
+    }
+
     const products = await Product.find({ shop: req.user.shopId });
     res.json(products);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
+  } catch (err) {
+    res.status(500).json({ msg: 'Server error', error: err.message });
   }
 });
-
-// Get single product
-router.get('/:id', auth, getProduct, (req, res) => {
-  res.json(res.product);
-});
-
-// Create new product
-router.post('/', auth, async (req, res) => {
-  const product = new Product({
-    name: req.body.name,
-    category: req.body.category,
-    price: req.body.price,
-    stock: req.body.stock,
-    description: req.body.description,
-    barcode: req.body.barcode,
-    image: req.body.image,
-    shop: req.user.shopId
-  });
-
+// ✅ Update a product by ID (protected route)
+router.put('/:id', auth, async (req, res) => {
   try {
-    const newProduct = await product.save();
-    res.status(201).json(newProduct);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
+    const { id } = req.params;
+    const updates = req.body;
 
-// Update product
-router.patch('/:id', auth, getProduct, async (req, res) => {
-  if (req.body.name != null) {
-    res.product.name = req.body.name;
-  }
-  if (req.body.category != null) {
-    res.product.category = req.body.category;
-  }
-  if (req.body.price != null) {
-    res.product.price = req.body.price;
-  }
-  if (req.body.stock != null) {
-    res.product.stock = req.body.stock;
-  }
-  if (req.body.description != null) {
-    res.product.description = req.body.description;
-  }
-  if (req.body.barcode != null) {
-    res.product.barcode = req.body.barcode;
-  }
-  if (req.body.image != null) {
-    res.product.image = req.body.image;
-  }
-
-  try {
-    const updatedProduct = await res.product.save();
-    res.json(updatedProduct);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
-});
-
-// Delete product
-router.delete('/:id', auth, getProduct, async (req, res) => {
-  try {
-    await Product.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Product deleted' });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Middleware to get product by ID
-async function getProduct(req, res, next) {
-  let product;
-  try {
-    product = await Product.findOne({ 
-      _id: req.params.id, 
-      shop: req.user.shopId 
-    });
-    if (product == null) {
-      return res.status(404).json({ message: 'Product not found' });
+    if (!req.user.shopId) {
+      return res.status(400).json({ msg: 'Shop ID not found in token' });
     }
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
 
-  res.product = product;
-  next();
-}
+    // Ensure product belongs to the logged-in shop
+    const product = await Product.findOneAndUpdate(
+      { _id: id, shop: req.user.shopId },
+      { $set: updates },
+      { new: true } // return updated document
+    );
+
+    if (!product) {
+      return res.status(404).json({ msg: 'Product not found or unauthorized' });
+    }
+
+    res.json(product);
+  } catch (err) {
+    res.status(500).json({ msg: 'Server error', error: err.message });
+  }
+});
+
+// ✅ Delete a product by ID (protected route)
+router.delete('/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!req.user.shopId) {
+      return res.status(400).json({ msg: 'Shop ID not found in token' });
+    }
+
+    const product = await Product.findOneAndDelete({
+      _id: id,
+      shop: req.user.shopId,
+    });
+
+    if (!product) {
+      return res.status(404).json({ msg: 'Product not found or unauthorized' });
+    }
+
+    res.json({ msg: 'Product deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ msg: 'Server error', error: err.message });
+  }
+});
 
 module.exports = router;

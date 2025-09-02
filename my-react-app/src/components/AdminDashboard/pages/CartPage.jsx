@@ -336,8 +336,8 @@ const CartDashboard = () => {
             <ShoppingCart className="w-8 h-8 text-white" />
           </motion.div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Smart Cart Dashboard</h1>
-            <p className="text-gray-600">Manage shopping carts and maintenance</p>
+           
+            <p className="text-xl text-gray-600">Manage shopping carts and maintenance</p>
           </div>
         </div>
         <div className="flex items-center space-x-4">
@@ -1186,7 +1186,7 @@ const CartDashboard = () => {
             </div>
           </div>
         ) : (
-          <div className="lg:col-span-2 flex items-center justify-center">
+          <div className="lg:col-span-2 sm:col-span-2  flex items-center justify-center">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}

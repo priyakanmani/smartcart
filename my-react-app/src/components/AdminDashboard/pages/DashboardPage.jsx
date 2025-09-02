@@ -1,3 +1,5 @@
+
+
 import React, { useEffect, useState } from 'react';
 import {
   ShoppingCart,
@@ -9,6 +11,7 @@ import {
   Activity,
   Menu,
   X,
+  Eye,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -75,8 +78,8 @@ const AdminDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="bg-white rounded-lg shadow-md p-8 max-w-md w-full mx-4">
           <div className="text-center">
-            <div className="mx-auto h-12 w-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
+            <div className="bg-gradient-to-br from-red-400 to-red-600 p-2 md:p-3 rounded-lg md:rounded-xl shadow-lg mx-auto mb-4">
+              <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-white" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Dashboard</h3>
             <p className="text-red-600">{error}</p>
@@ -90,30 +93,34 @@ const AdminDashboard = () => {
     {
       title: 'Total Shops',
       value: overview?.totalShops ?? 0,
-      icon: <Store className="w-6 h-6 md:w-8 md:h-8" />,
-      gradient: 'from-blue-500 to-blue-600',
-      iconColor: 'text-blue-600',
+      icon: Store,
+      
+      iconBg: 'from-blue-400 to-blue-500',
+      iconColor: 'text-white',
     },
     {
       title: 'Total Carts',
       value: overview?.totalCarts ?? 0,
-      icon: <ShoppingCart className="w-6 h-6 md:w-8 md:h-8" />,
-      gradient: 'from-green-500 to-green-600',
-      iconColor: 'text-green-600',
+      icon: ShoppingCart,
+     
+      iconBg: 'from-green-400 to-green-500',
+      iconColor: 'text-white',
     },
     {
       title: 'Total Revenue',
       value: `₹${(overview?.totalRevenue ?? 0).toLocaleString()}`,
-      icon: <DollarSign className="w-6 h-6 md:w-8 md:h-8" />,
-      gradient: 'from-purple-500 to-purple-600',
-      iconColor: 'text-purple-600',
+      icon: DollarSign,
+      
+      iconBg: 'from-purple-400 to-purple-500',
+      iconColor: 'text-white',
     },
     {
       title: 'Active Users',
       value: overview?.activeUsers ?? 0,
-      icon: <Users className="w-6 h-6 md:w-8 md:h-8" />,
-      gradient: 'from-orange-500 to-orange-600',
-      iconColor: 'text-orange-600',
+      icon: Users,
+     
+      iconBg: 'from-orange-400 to-orange-500',
+      iconColor: 'text-white',
     },
   ];
 
@@ -125,7 +132,7 @@ const AdminDashboard = () => {
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="p-2 rounded-md bg-white shadow-lg text-gray-700"
         >
-          {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {mobileMenuOpen ? <X className="h-5 w-5 md:h-6 md:w-6" /> : <Menu className="h-5 w-5 md:h-6 md:w-6" />}
         </button>
       </div>
 
@@ -157,14 +164,14 @@ const AdminDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center py-4 md:py-6 space-y-4 md:space-y-0">
             <div className="flex items-center space-x-3 md:space-x-4">
-              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 md:p-3 rounded-xl shadow-lg">
-                <Activity className="w-6 h-6 md:w-8 md:h-8 text-white" />
+              <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2 md:p-3 rounded-lg md:rounded-xl shadow-lg">
+                <Activity className="h-5 w-5 md:h-6 md:w-6 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-gray-600 text-sm md:text-base mt-1">
+
+                <h1 className="text-gray-600 text-xs md:text-base mt-1">
                   Welcome back! Here's what's happening with your platform.
-                </p>
+                </h1>
               </div>
             </div>
             <div className="flex items-center space-x-3 md:space-x-4 w-full md:w-auto justify-between md:justify-normal">
@@ -181,35 +188,39 @@ const AdminDashboard = () => {
       </div>
 
       {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-        {/* Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
-          {stats.map((stat, i) => (
-            <div
-              key={i}
-              className={`bg-gradient-to-br ${stat.gradient} text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden`}
-            >
-              <div className="absolute top-0 right-0 -mt-2 -mr-2 md:-mt-4 md:-mr-4 w-16 h-16 md:w-24 md:h-24 bg-white opacity-10 rounded-full" />
-              <div className="absolute bottom-0 left-0 -mb-4 -ml-4 md:-mb-6 md:-ml-6 w-12 h-12 md:w-16 md:h-16 bg-white opacity-5 rounded-full" />
-              <div className="flex items-center justify-between relative z-10">
-                <div>
-                  <p className="text-white opacity-80 text-xs md:text-sm font-medium mb-1 md:mb-2 uppercase tracking-wide">
-                    {stat.title}
-                  </p>
-                  <p className="text-xl md:text-2xl lg:text-3xl font-bold mb-1">{stat.value}</p>
-                  <div className="flex items-center">
-                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4 text-white opacity-70 mr-1" />
-                    <span className="text-xs text-white opacity-70">
-                      +12% from last month
-                    </span>
+  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+  {/* Stats */}
+  <div className="grid grid-cols-1 sm:grid-cols-2 sm:grid-rows-2 md:grid-cols-2 md:grid-rows-2 lg:grid-cols-2 xl:grid-cols-4  xl:grid-rows-1 gap-4 md:gap-6 mb-6 md:mb-8">
+    
+    {stats.map((stat, i) => {
+            const IconComponent = stat.icon;
+            return (
+              <div
+                key={i}
+                className={`bg-gradient-to-br ${stat.gradient} text-white p-4 md:p-6 rounded-xl md:rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 relative overflow-hidden`}
+              >
+                <div className="absolute top-0 right-0 -mt-2 -mr-2 md:-mt-4 md:-mr-4 w-16 h-16 md:w-24 md:h-24 bg-white opacity-10 rounded-full" />
+                <div className="absolute bottom-0 left-0 -mb-4 -ml-4 md:-mb-6 md:-ml-6 w-12 h-12 md:w-16 md:h-16 bg-white opacity-5 rounded-full" />
+                <div className="flex items-center justify-between relative z-10">
+                  <div>
+                    <p className="text-black opacity-80 text-xs md:text-sm font-medium mb-1 md:mb-2 uppercase tracking-wide">
+                      {stat.title}
+                    </p>
+                    <p className="text-xl md:text-2xl lg:text-3xl text-black font-bold mb-1">{stat.value}</p>
+                    <div className="flex items-center">
+                      
+                      <span className="text-xs text-black opacity-70">
+                        +12% from last month
+                      </span>
+                    </div>
+                  </div>
+                  <div className={`bg-gradient-to-br ${stat.iconBg} p-2 md:p-3 rounded-lg md:rounded-xl backdrop-blur-sm shadow-lg`}>
+                    <IconComponent className="h-10 w-10 md:h-10 md:w-10 text-white" />
                   </div>
                 </div>
-                <div className="bg-white bg-opacity-90 p-2 md:p-3 rounded-lg md:rounded-xl backdrop-blur-sm shadow-lg">
-                  <div className={stat.iconColor}>{stat.icon}</div>
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Alerts */}
@@ -246,8 +257,8 @@ const AdminDashboard = () => {
                   className="flex items-center p-3 md:p-4 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg md:rounded-xl hover:shadow-sm md:hover:shadow-md transition-all duration-200"
                 >
                   <div className="flex-shrink-0">
-                    <div className="bg-yellow-100 p-1 md:p-2 rounded-md md:rounded-lg">
-                      <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-yellow-600" />
+                    <div className="bg-gradient-to-br from-amber-400 to-orange-500 p-2 rounded-lg shadow-lg">
+                      <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-white" />
                     </div>
                   </div>
                   <div className="ml-3 md:ml-4 flex-1 min-w-0">
@@ -261,20 +272,8 @@ const AdminDashboard = () => {
                     </p>
                   </div>
                   <div className="flex items-center space-x-1 md:space-x-2">
-                    <button className="bg-yellow-200 hover:bg-yellow-300 p-1 md:p-2 rounded-md md:rounded-lg transition-colors">
-                      <svg
-                        className="h-3 w-3 md:h-4 md:w-4 text-yellow-700"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
+                    <button className="bg-gradient-to-br from-amber-400 to-orange-500 p-2 rounded-lg shadow-lg transition-colors hover:from-amber-500 hover:to-orange-600">
+                      <Eye className="h-3 w-3 md:h-4 md:w-4 text-white" />
                     </button>
                   </div>
                 </div>
@@ -318,3 +317,6 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
+
+
+

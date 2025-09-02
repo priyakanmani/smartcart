@@ -20,6 +20,65 @@ const verifyAdmin = (req, res, next) => {
     return res.status(401).json({ message: 'Invalid admin token' });
   }
 };
+// --- Manager login ---
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password required' });
+    }
+
+    const manager = await Manager.findOne({ email });
+    if (!manager) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const isMatch = await bcrypt.compare(password, manager.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { id: manager._id, role: 'manager', shopId: manager.shop.id},
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+
+    res.json({
+      message: 'Login successful',
+      token,
+      manager: {
+        id: manager._id,
+        managerName: manager.managerName,
+        email: manager.email,
+        shop: manager.shop,
+        assignedCarts: manager.assignedCarts
+      }
+    });
+  } catch (err) {
+    console.error('Manager login error:', err);
+    res.status(500).json({ message: 'Server error during login' });
+  }
+});
+// --- Get manager profile by email ---
+router.get('/profile', async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const manager = await Manager.findOne({ email }).select('-password');
+    if (!manager) {
+      return res.status(404).json({ message: 'Manager not found' });
+    }
+
+    res.json(manager);
+  } catch (err) {
+    console.error('Error fetching manager profile:', err);
+    res.status(500).json({ message: 'Server error fetching profile' });
+  }
+});
 
 // --- Admin login ---
 router.post('/login', async (req, res) => {

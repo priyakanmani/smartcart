@@ -61,7 +61,7 @@ router.get('/overview', verifyAdmin, async (req, res) => {
     let alerts = [];
 
     if (Shop && Cart && User && Alert) {
-      totalShops = await Shop.countDocuments();
+      totalShops = await Manager.countDocuments();
       totalCarts = await Cart.countDocuments();
       const revenueAgg = await Cart.aggregate([
         { $group: { _id: null, total: { $sum: '$revenue' } } },
